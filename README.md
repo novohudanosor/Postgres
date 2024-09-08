@@ -69,4 +69,38 @@ hot_standby_feedback = on
 password_encryption = scram-sha-256
 include_dir = 'conf.d'
 ```
- 
+ * на обоих хостах настраиваем параметры подключения в файле /etc/postgresql/14/main/pg_hba.conf:
+```
+# Database administrative login by Unix domain socket
+local   all             postgres                                peer
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+# "local" is for Unix domain socket connections only
+local   all             all                                     peer
+# IPv4 local connections:
+host    all             all             127.0.0.1/32            scram-sha-256
+# IPv6 local connections:
+host    all             all             ::1/128                 scram-sha-256
+# Allow replication connections from localhost, by a user with the
+# replication privilege.
+local   replication     all                                     peer
+host    replication     all             127.0.0.1/32            scram-sha-256
+host    replication     all             ::1/128                 scram-sha-256
+host    replication     replicator      192.168.56.11/32        scram-sha-256
+host    replication     replicator      192.168.56.12/32        scram-sha-256
+host    all             barman          192.168.56.13/32        scram-sha-256
+host    replication     barman          192.168.56.13/32        scram-sha-256
+```
+*Две последние строки в файле разрешают репликацию пользователю replication.*
+* Перезапустим postgresql на обоих хостах:
+```
+systemctl restart postgresql
+```
+## На хосте node2: 
+1) Останавливаем postgresql-server:``` systemctl stop postgresql ```
+2) С помощью утилиты pg_basebackup копируем данные с node1:
+``` pg_basebackup -h 192.168.57.11 -U    /var/lib/postgresql/14/main/ -R -P ```
+3) В файле  /etc/postgresql/14/main/postgresql.conf меняем параметр:
+``` listen_addresses = 'localhost, 192.168.57.12'  ```
+4) Запускаем службу postgresql-server: ``` systemctl start postgresql ```
+
+
